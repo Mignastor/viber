@@ -1,0 +1,155 @@
+/* Design tokens. Dark is the default; light applies when the OS prefers it (unless the user
+   forced dark) or when the user picks it. Every colour in the UI comes from here. */
+
+:root {
+  --bg: #0a0e13;
+  --canvas: #0c1117;
+  --panel: #10151c;
+  --panel-2: #151b23;
+  --panel-3: #1b222c;
+  --border: #212a35;
+  --border-2: #2c3644;
+  --border-hover: #3a4657;
+  --text: #d8dfe8;
+  --muted: #7f8b9b;
+  --accent: #7c9cff;
+  --accent-2: #5b7cf0;
+
+  --intent: #f5b544;
+  --active: #3fd0ff;
+  --changed: #b794ff;
+  --ghost: #f5b544;
+  --candidate: #f472b6;
+  --warning: #ff6b6b;
+  --ok: #4ade80;
+  --add: #4ade80;
+  --del: #ff7b72;
+  --heat: #fb923c;
+  --highlight: #facc15;
+
+  --intent-bg: #2a2112;
+  --intent-border: #6f5520;
+  --active-bg: #102531;
+  --active-border: #1f5f75;
+  --changed-bg: #1f1830;
+  --changed-border: #4f3e78;
+  --candidate-bg: #24141e;
+  --candidate-border: #6b2d52;
+  --warning-bg: #241417;
+  --warning-border: #6b2f33;
+  --danger-on-bg: #3a1d20;
+  --ok-border: #2e6b47;
+  --fence-bg: #14251d;
+  --fence-border: #2e5141;
+  --fence-fg: #8fe3b2;
+  --accent-soft-bg: #1c2440;
+  --accent-soft-border: #46589a;
+  --accent-soft-fg: #aab9ff;
+  --you-bg: #171d30;
+
+  --editor-bg: #0d1218;
+  --editor-line: #141b23;
+  --term-bg: #0b0f14;
+  --overlay-bg: #121821f2;
+  --legend-bg: #10151ccc;
+  --modal-backdrop: #05080ccc;
+  --container-bg: #ffffff05;
+  --actor-bg: #141a26;
+  --external-bg: #12171e;
+  --datastore-bg-1: #18202a;
+  --datastore-bg-2: #141a22;
+  --active-node-bg: #11222c;
+  --warning-node-bg: #221416;
+  --edge: #3b4656;
+  --edge-idle-marker: #4a5668;
+  --dots: #1d2530;
+  --scrollbar: #232c38;
+  --sym-fg: #c7d2fe;
+  --contract-fg: #aeb9c7;
+  --log-fg: #b9c3d0;
+  --shadow: #000a;
+  --shadow-soft: #0008;
+  --welcome-glow: #1a2340;
+  --welcome-card: #10151ce6;
+  --minimap-node: #2a3442;
+  --minimap-mask: rgba(8, 11, 15, 0.7);
+  --mono: 'JetBrains Mono', 'Cascadia Code', 'SF Mono', Consolas, monospace;
+  --sans: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+  color-scheme: dark;
+}
+
+/* Light palette: same semantics, tuned for contrast on white. */
+:root[data-theme='light'] {
+  --bg: #f4f5f8;
+  --canvas: #fafbfc;
+  --panel: #ffffff;
+  --panel-2: #f3f4f7;
+  --panel-3: #e9ecf1;
+  --border: #e1e4ea;
+  --border-2: #cfd4dc;
+  --border-hover: #b3bac6;
+  --text: #1d2330;
+  --muted: #667085;
+  --accent: #4f6bed;
+  --accent-2: #4060e0;
+
+  --intent: #b7791f;
+  --active: #0891b2;
+  --changed: #7c3aed;
+  --ghost: #b7791f;
+  --candidate: #db2777;
+  --warning: #dc2626;
+  --ok: #16a34a;
+  --add: #16a34a;
+  --del: #dc2626;
+  --heat: #ea580c;
+  --highlight: #ca8a04;
+
+  --intent-bg: #fdf3e1;
+  --intent-border: #f0d29b;
+  --active-bg: #e2f6fb;
+  --active-border: #9edcea;
+  --changed-bg: #f1ebfd;
+  --changed-border: #cdb8f6;
+  --candidate-bg: #fce8f2;
+  --candidate-border: #f2b3d2;
+  --warning-bg: #fdecec;
+  --warning-border: #f3b4b4;
+  --danger-on-bg: #fbdcdc;
+  --ok-border: #9ad8b0;
+  --fence-bg: #e8f7ee;
+  --fence-border: #a9dcbc;
+  --fence-fg: #15803d;
+  --accent-soft-bg: #e8edfd;
+  --accent-soft-border: #b7c4f5;
+  --accent-soft-fg: #3651c9;
+  --you-bg: #eef1fd;
+
+  --editor-bg: #ffffff;
+  --editor-line: #f4f6fa;
+  --term-bg: #ffffff;
+  --overlay-bg: #ffffffee;
+  --legend-bg: #ffffffdd;
+  --modal-backdrop: #1d233066;
+  --container-bg: #1d23300a;
+  --actor-bg: #f3f5fb;
+  --external-bg: #f7f8fa;
+  --datastore-bg-1: #f7f8fa;
+  --datastore-bg-2: #eef0f4;
+  --active-node-bg: #e9f8fc;
+  --warning-node-bg: #fdf0f0;
+  --edge: #b3bac6;
+  --edge-idle-marker: #98a2b3;
+  --dots: #d8dde5;
+  --scrollbar: #cfd4dc;
+  --sym-fg: #3651c9;
+  --contract-fg: #475467;
+  --log-fg: #344054;
+  --shadow: #1018282e;
+  --shadow-soft: #1018281f;
+  --welcome-glow: #dfe6fb;
+  --welcome-card: #ffffffee;
+  --minimap-node: #d0d5dd;
+  --minimap-mask: rgba(240, 242, 246, 0.7);
+  color-scheme: light;
+}

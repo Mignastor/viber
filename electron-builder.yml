@@ -1,0 +1,31 @@
+appId: dev.viber.app
+productName: Viber
+directories:
+  buildResources: build
+  output: dist
+# node-pty ships prebuilt N-API binaries for every platform: no native rebuild needed (or wanted).
+npmRebuild: false
+files:
+  - out/**
+  - package.json
+asarUnpack:
+  - resources/**
+  - node_modules/tree-sitter-wasms/**
+  - node_modules/web-tree-sitter/**
+  - node_modules/node-pty/**
+  - node_modules/typescript/**
+  - node_modules/typescript-language-server/**
+  - node_modules/pyright/**
+win:
+  target: nsis
+mac:
+  target: dmg
+  category: public.app-category.developer-tools
+linux:
+  target:
+    - AppImage
+    - deb
+  category: Development
+publish:
+  provider: github
+  releaseType: draft

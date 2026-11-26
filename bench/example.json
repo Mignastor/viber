@@ -1,0 +1,24 @@
+{
+  "name": "Example suite",
+  "repo": "../../my-app",
+  "agents": ["claude-code"],
+  "variants": ["baseline", "viber"],
+  "repeat": 1,
+  "timeoutMin": 15,
+  "tasks": [
+    {
+      "id": "health-endpoint",
+      "prompt": "Add a GET /api/health endpoint to the web API that returns {\"status\": \"ok\"}.",
+      "check": "python -c \"import ast;ast.parse(open('backend/app.py',encoding='utf-8').read())\"",
+      "expect": { "contains": [{ "file": "backend/app.py", "text": "/api/health" }] }
+    },
+    {
+      "id": "rename-route",
+      "prompt": "Rename the /api/orders endpoint to /api/purchases, in the backend and in every frontend call.",
+      "expect": {
+        "contains": [{ "file": "backend/app.py", "text": "/api/purchases" }],
+        "absent": [{ "file": "frontend/src/api.ts", "text": "/api/orders" }]
+      }
+    }
+  ]
+}

@@ -1,0 +1,659 @@
+/* Design mode, specs, architect, journeys, questions, drift, build. */
+
+.design-toolbar {
+  position: absolute;
+  top: 56px;
+  left: 10px;
+  z-index: 12;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px;
+  border-radius: 9px;
+  background: var(--legend-bg);
+  border: 1px solid var(--border);
+}
+
+/* Node status and diff */
+.status-tag {
+  font-size: 10.5px;
+  padding: 0 6px;
+  border-radius: 8px;
+  border: 1px solid var(--border-2);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.status-tag.st-planned {
+  color: var(--accent);
+  border-color: var(--accent-soft-border);
+  background: var(--accent-soft-bg);
+}
+.status-tag.st-building {
+  color: var(--active);
+  border-color: var(--active-border);
+  background: var(--active-bg);
+}
+.status-tag.st-built {
+  color: var(--changed);
+  border-color: var(--changed-border);
+}
+.status-tag.st-verified {
+  color: var(--ok);
+  border-color: var(--ok-border);
+}
+.arch-node.planned-box {
+  border-style: dashed;
+  border-color: var(--accent-soft-border);
+  background: color-mix(in srgb, var(--accent-soft-bg) 55%, var(--panel-2));
+}
+.arch-node.is-new,
+.container-node.is-new {
+  border-style: dashed;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+.tag-new {
+  color: var(--accent);
+  border-color: var(--accent-soft-border);
+  background: var(--accent-soft-bg);
+}
+.react-flow__edge-path.arch-edge.planned {
+  stroke: var(--accent);
+  stroke-dasharray: 7 5;
+  opacity: 0.85;
+}
+.react-flow__edge-path.arch-edge.undeclared {
+  stroke: var(--intent);
+  stroke-dasharray: 2 4;
+  stroke-width: 2;
+}
+.react-flow__edge-path.arch-edge.is-new {
+  stroke: var(--accent);
+  stroke-width: 2.4;
+  stroke-dasharray: 7 5;
+}
+
+/* Spec editor */
+.spec {
+  margin-top: 6px;
+}
+.spec-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+.spec-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.spec-field select {
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--border-2);
+  border-radius: 6px;
+  font: inherit;
+  padding: 3px 6px;
+}
+.spec-block {
+  margin-top: 10px;
+}
+.spec-label {
+  display: block;
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 2px;
+}
+.contract-items {
+  list-style: none;
+  padding: 0;
+  margin: 4px 0;
+}
+.contract-items li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 6px;
+  border-radius: 6px;
+  background: var(--panel-2);
+  margin: 3px 0;
+  flex-wrap: wrap;
+}
+.contract-items li .icon-btn {
+  margin-left: auto;
+}
+.contract-kind {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 0 5px;
+  border-radius: 5px;
+  background: var(--accent-soft-bg);
+  color: var(--accent-soft-fg);
+}
+.contract-add {
+  display: grid;
+  grid-template-columns: 76px 1fr 0.7fr 0.7fr auto;
+  gap: 4px;
+  margin-top: 4px;
+}
+.contract-add select {
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--border-2);
+  border-radius: 6px;
+  font: inherit;
+  font-size: 11.5px;
+}
+
+/* Design panel */
+.design-panel,
+.build-panel {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px 10px 30px;
+}
+.design-panel section,
+.build-panel section {
+  margin-bottom: 16px;
+}
+.design-panel h3,
+.build-panel h3 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.7px;
+  color: var(--muted);
+  margin: 0 0 6px;
+}
+.chat {
+  max-height: 46vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.chat-turn {
+  padding: 8px 10px;
+  border-radius: 9px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  font-size: 12.5px;
+}
+.chat-turn.user {
+  background: var(--you-bg);
+  margin-left: 18px;
+}
+.chat-turn p {
+  margin: 0;
+}
+.diff-card {
+  margin-top: 8px;
+  padding: 6px 8px;
+  border-radius: 7px;
+  border: 1px dashed var(--accent-soft-border);
+  background: color-mix(in srgb, var(--accent-soft-bg) 50%, transparent);
+}
+.diff-card ul {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 4px;
+}
+.diff-card.accepted {
+  border-style: solid;
+  border-color: var(--ok-border);
+}
+.diff-card.rejected {
+  opacity: 0.55;
+}
+.chat-input {
+  display: flex;
+  gap: 6px;
+  align-items: flex-end;
+}
+.chat-input textarea {
+  flex: 1;
+  resize: none;
+  background: var(--panel);
+  border: 1px solid var(--border-2);
+  border-radius: 8px;
+  color: var(--text);
+  font: inherit;
+  padding: 6px 8px;
+}
+.chat-input textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.question-card {
+  padding: 8px 10px;
+  border-radius: 9px;
+  border: 1px solid var(--intent-border);
+  background: var(--intent-bg);
+  margin-bottom: 8px;
+}
+.question-card p {
+  margin: 4px 0;
+}
+.drift-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 5px 8px;
+  border-left: 2px solid var(--intent);
+  margin: 4px 0;
+  cursor: pointer;
+  border-radius: 0 6px 6px 0;
+}
+.drift-row:hover {
+  background: var(--panel-2);
+}
+.drift-row.drift-missing-dependency,
+.drift-row.drift-missing-route {
+  border-left-color: var(--warning);
+}
+.drift-kind {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--muted);
+}
+
+/* Journeys */
+.journey-step {
+  display: grid;
+  grid-template-columns: 20px 180px 1fr auto;
+  gap: 6px;
+  align-items: center;
+}
+.step-n {
+  font-size: 11px;
+  color: var(--muted);
+  text-align: right;
+}
+.grow {
+  flex: 1;
+}
+.edge-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+
+/* Build */
+.wave {
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 6px;
+  margin: 6px 0;
+}
+.wave-n {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--muted);
+}
+.wave-box {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.wave-box:hover {
+  background: var(--panel-2);
+}
+.wave-box.st-running .tree-meta {
+  color: var(--active);
+}
+.wave-box.st-verified .tree-meta {
+  color: var(--ok);
+}
+.wave-box.st-failed .tree-meta {
+  color: var(--warning);
+}
+.wave-box.st-review .tree-meta {
+  color: var(--intent);
+}
+.build-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+.build-controls select {
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--border-2);
+  border-radius: 6px;
+  font: inherit;
+  font-size: 12px;
+  padding: 3px 6px;
+}
+.left .panel-head.tabs > button {
+  padding: 6px 8px;
+}
+.diff-card .card-actions {
+  flex-wrap: wrap;
+  align-items: center;
+}
+.diff-card .card-actions > span {
+  flex-basis: 100%;
+}
+
+/* Journey / Explain playback */
+.arch-node.journey-off,
+.container-node.journey-off {
+  opacity: 0.18;
+}
+.arch-node.journey-pending {
+  opacity: 0.6;
+}
+.arch-node.journey-visited {
+  border-color: var(--highlight);
+}
+.arch-node.journey-current {
+  border-color: var(--highlight);
+  border-width: 2px;
+  box-shadow:
+    0 0 0 4px color-mix(in srgb, var(--highlight) 35%, transparent),
+    0 0 28px color-mix(in srgb, var(--highlight) 45%, transparent);
+  transform: scale(1.04);
+}
+.react-flow__edge-path.arch-edge.journey-off {
+  opacity: 0.1;
+}
+.react-flow__edge-path.arch-edge.journey-visited {
+  stroke: var(--highlight);
+  stroke-width: 2;
+  opacity: 0.6;
+}
+.react-flow__edge-path.arch-edge.journey-current {
+  stroke: var(--highlight);
+  stroke-width: 3;
+  opacity: 1;
+}
+.react-flow__edge-path.arch-edge.hop {
+  stroke: var(--intent);
+  stroke-dasharray: 3 6;
+}
+.edge-label.journey-off {
+  opacity: 0.12;
+}
+.edge-label.journey-current {
+  color: var(--highlight);
+  border-color: var(--highlight);
+  font-weight: 600;
+}
+.edge-label.hop {
+  color: var(--intent);
+  border-style: dashed;
+  border-color: var(--intent-border);
+}
+.journey-pulse {
+  fill: var(--highlight);
+  filter: drop-shadow(0 0 5px var(--highlight));
+}
+.journey-action {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--text);
+}
+.journey-gap {
+  color: var(--intent);
+}
+.list-row .play-journey {
+  color: var(--accent);
+}
+/* Architectural Change Proposals: a contract change waiting for the human. */
+.acp-card {
+  padding: 8px 10px;
+  border-radius: 9px;
+  border: 1px dashed var(--intent-border);
+  background: var(--intent-bg);
+  margin-bottom: 8px;
+}
+.acp-card.approved,
+.acp-card.rejected {
+  border-style: solid;
+  border-color: var(--border);
+  background: transparent;
+  opacity: 0.8;
+}
+.acp-card p {
+  margin: 4px 0;
+}
+.acp-head {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  flex-wrap: wrap;
+  cursor: pointer;
+}
+.acp-status {
+  margin-left: auto;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--intent);
+}
+.acp-status.approved {
+  color: var(--ok, var(--accent));
+}
+.acp-status.rejected {
+  color: var(--warning);
+}
+.arch-node.acp-pending {
+  border-style: dashed;
+  border-color: var(--intent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--intent) 25%, transparent);
+}
+.tag-acp {
+  color: var(--intent);
+  border-color: var(--intent-border);
+  background: var(--intent-bg);
+}
+.react-flow__edge-path.arch-edge.acp {
+  stroke: var(--intent);
+  stroke-width: 2.5;
+  stroke-dasharray: 6 5;
+  opacity: 1;
+}
+/* Typed contracts checked against the code. */
+.check-badge {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+.check-badge.ok {
+  color: var(--ok);
+}
+.check-badge.mismatch {
+  color: var(--warning);
+}
+.check-badge.unverified {
+  color: var(--muted);
+}
+/* Side effects a box may have. */
+.effect-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+.effect-chip {
+  font: inherit;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.effect-chip.found {
+  color: var(--text);
+  border-style: dashed;
+}
+.effect-chip.on {
+  color: var(--accent);
+  border: 1px solid var(--accent-soft-border);
+  background: var(--accent-soft-bg);
+}
+.effect-chip.bad {
+  color: var(--warning);
+  border: 1px solid var(--warning-border);
+  background: var(--warning-bg);
+}
+.link-btn {
+  font: inherit;
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--accent);
+  cursor: pointer;
+}
+/* Code style rules (project default and per-box override). */
+.style-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  align-items: center;
+  font-size: 12px;
+}
+.style-fields label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.style-fields input[type='number'] {
+  width: 64px;
+}
+.tech-advice {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  align-items: baseline;
+  margin-top: 4px;
+}
+/* Coding agents (Connect agents dialog). */
+.coding-agents h4 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.agent-row {
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  margin-bottom: 6px;
+}
+.agent-row.ready {
+  border-color: var(--ok-border);
+}
+.agent-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.agent-state {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--muted);
+}
+.agent-state.ready {
+  color: var(--ok);
+}
+.agent-state.signed-out,
+.agent-state.missing {
+  color: var(--intent);
+}
+/* Design check. */
+.check-row-item {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+  font-size: 12px;
+  padding: 3px 0;
+  cursor: default;
+}
+.check-row-item svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.check-row-item.is-ok svg {
+  color: var(--ok);
+}
+.check-row-item.is-bad svg {
+  color: var(--intent);
+}
+/* Dry runs. */
+.scenario-row {
+  margin-top: 6px;
+}
+.dry-step {
+  margin-top: 6px;
+  border-top: 1px solid var(--border);
+  padding-top: 6px;
+}
+.dry-step p {
+  margin: 3px 0;
+}
+.dry-payload {
+  margin: 4px 0;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: var(--accent-soft-bg);
+  font-size: 11px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 140px;
+  overflow: auto;
+}
+.dry-end {
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+/* Live progress of design requests. */
+.design-progress {
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px dashed var(--border);
+  margin: 6px 0;
+}
+.design-progress p {
+  margin: 2px 0;
+}
+.progress-text {
+  white-space: pre-wrap;
+  max-height: 160px;
+  overflow: auto;
+  opacity: 0.85;
+}
+/* Prompt bar mode switch. */
+.mode-switch {
+  margin-right: 8px;
+  flex-shrink: 0;
+}
+.mode-switch button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.chat-hint {
+  margin-top: 6px;
+}
