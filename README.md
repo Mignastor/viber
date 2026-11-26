@@ -16,12 +16,45 @@ Viber makes that shape the main screen:
 
 - **The map is the source of truth.** Boxes are components with one job, edges are contracts, and actors are the
   people and systems that use them. It's saved as `.arch/model.yaml` in your repo.
-- **You set the direction, agents write the code.** Select boxes, describe a change, and pick Claude Code, Codex,
-  Gemini, a local model, or your own tool.
+- **You set the direction, agents write the code.** You design the components and contracts and describe the user
+  journeys. Agents build from that: select boxes, describe a change, and pick Claude Code, Codex, Gemini, a local
+  model, or your own tool.
 - **Every edit shows up on the map.** Plans arrive as diagram diffs you approve. Edits outside the plan are flagged,
   and you review the result box by box.
 - **Agents use fewer tokens.** Agents get a context pack for just the boxes in scope, plus tools that point them at the
   exact functions to change, so they don't have to grep the whole repo.
+
+## Journeys: what humans write
+
+In Viber, humans own the design and agents own the code. The most important part of the design is the
+**journeys**: step-by-step paths that an actor takes through the components.
+
+> **Member RSVPs to the next meeting:** Web App opens Upcoming and taps "I'm coming" → HTTP API gets
+> `POST /meetings/42/rsvp` → Meetings records the RSVP, one per member → HTTP API returns the meeting → Web App shows
+> "You're in · 7 going".
+
+A journey is written in plain words, but each step names a real box, and each hop between boxes has to go through a
+contract. That one description does three jobs:
+
+1. **It makes sure the right thing gets built.** Journeys describe what people actually do, in the product's terms.
+   If a journey can't be told with the boxes on the map, the design is wrong or incomplete, and it's far cheaper to
+   learn that before any code exists.
+2. **It tests the design before the build.** Viber walks every journey across the map. A step that reaches a box
+   with no contract to carry it is flagged, and the **design check** won't call the design complete until every actor
+   has a journey and every step goes through a contract. A **dry run** goes further: an AI plays the journey step by
+   step, saying what data crosses each contract and what changes, and Viber checks each step against the real design.
+   You can also describe a scenario in words and dry-run it without saving it.
+3. **It drives the code.** When a box is built, its agent gets every journey that passes through it along with its
+   spec and contracts, so it knows the box's part in the larger flow, not just its own functions.
+
+![A journey played on the map: the Reminders → Notifier step has no contract, and the design check flags it](docs/screenshots/journey-gap.png)
+
+*Here the "reminder the day before" journey reaches Notifier, but nobody drew a contract from Reminders to Notifier.
+The map shows the broken hop, and the design check lists it with a button to ask the architect to fix it.*
+
+**Next:** turning each journey into an end-to-end acceptance test on the real code, so a journey that passed as a
+design keeps passing once the code exists. Today, agents write tests for each box's acceptance criteria and contract.
+Generating tests from journeys isn't built yet.
 
 ## A tour
 
@@ -149,7 +182,8 @@ More tools:
 - **Design tab:**
   - Architect chat: describe what you want; it proposes components, contracts, actors and journeys as a diagram diff, previewed dashed on the map. Accept or reject.
   - Agents' questions pinned on boxes; an answer can become a rule on the box.
-  - Journeys.
+  - Journeys (see [Journeys](#journeys-what-humans-write)): add them by hand or from the architect, play them on the
+    map step by step, or dry-run them.
   - Drift between the design and the code.
 - **On the map:**
   - *+ Component* adds a planned box.
