@@ -288,7 +288,8 @@ export class Workspace extends EventEmitter {
       case 'upsertJourney': {
         d.journeys = d.journeys ?? []
         const i = d.journeys.findIndex((j) => j.id === op.journey.id)
-        if (i >= 0) d.journeys[i] = op.journey
+        // Editing a journey keeps its test unless the edit says otherwise.
+        if (i >= 0) d.journeys[i] = { ...op.journey, test: 'test' in op.journey ? op.journey.test : d.journeys[i].test }
         else d.journeys.push(op.journey)
         break
       }

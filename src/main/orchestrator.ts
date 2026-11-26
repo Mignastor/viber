@@ -5,11 +5,22 @@ import { ctx } from './context'
 import { startSession, stopSession } from './agents'
 import { git, isRepo } from './git'
 import { specText } from './contextPack'
+import { journeyBoxes, journeyBuilt } from './journeyPlan'
+import { runJourneyTests, writeJourneyTest } from './journeyTests'
 
 // Build from the spec: every box that is planned (or chosen) becomes an agent task generated from
 // its spec. Providers are built before their consumers; boxes in the same wave run in parallel in
 // their own worktrees. A box is "built" when its session ends cleanly and "verified" when its tests
-// pass.
+// pass and so do the end-to-end tests of the journeys through it. After the boxes, each journey
+// through them gets its test written (when it has none) and run.
+
+export interface BuildJourneyState {
+  id: string
+  name: string
+  state: 'waiting' | 'writing' | 'running' | 'pass' | 'fail' | 'skipped'
+  sessionId?: string
+  note?: string
+}
 
 export interface BuildBoxState {
   id: string
@@ -24,9 +35,10 @@ export interface BuildState {
   running: boolean
   waves: string[][]
   boxes: Record<string, BuildBoxState>
+  journeys: Record<string, BuildJourneyState>
 }
 
-let state: BuildState = { running: false, waves: [], boxes: {} }
+let state: BuildState = { running: false, waves: [], boxes: {}, journeys: {} }
 let cancelled = false
 const emit = (): void => ctx.emit('build:state', state)
 
@@ -79,7 +91,7 @@ export function boxTask(model: ArchModel, n: ArchNode): string {
     provides.length ? `Other boxes rely on it: ${provides.map((e) => `${label(e.source)} uses ${e.contract.join(', ') || e.kind}`).join('; ')}.` : '',
     uses.length ? `It may only depend on: ${uses.map((e) => `${label(e.target)} (${e.contract.join(', ') || e.kind})`).join('; ')}.` : 'It should not depend on other boxes.',
     providerSpecs.length ? `Their contracts: ${providerSpecs.join(' | ')}.` : '',
-    journeys.length ? `Journeys through this box:\n${journeys.map((j) => `- ${label(j.actor)}: ${j.name} — ${j.steps.map((s) => `${label(s.box)} (${s.action})`).join(' → ')}`).join('\n')}` : '',
+    journeys.length ? `Journeys through this box (once all their boxes are built, each becomes an end-to-end test on the real code, so this box must play its part):\n${journeys.map((j) => `- ${label(j.actor)}: ${j.name} — ${j.steps.map((s) => `${label(s.box)} (${s.action})`).join(' → ')}`).join('\n')}` : '',
     where,
     'Write tests that check the acceptance criteria and the contract. Stay inside this box; if the spec is ambiguous, ask_human; record notable choices with record_decision.'
   ]
@@ -126,7 +138,10 @@ export async function startBuild(opts: { ids?: string[]; agent: AgentKind; maxPa
   state = {
     running: true,
     waves,
-    boxes: Object.fromEntries(waves.flatMap((w, i) => w.map((id) => [id, { id, label: model.nodes.find((n) => n.id === id)?.label ?? id, wave: i, state: 'waiting' as const }])))
+    boxes: Object.fromEntries(waves.flatMap((w, i) => w.map((id) => [id, { id, label: model.nodes.find((n) => n.id === id)?.label ?? id, wave: i, state: 'waiting' as const }]))),
+    journeys: Object.fromEntries(
+      (model.journeys ?? []).filter((j) => journeyBoxes(j).some((b) => waves.some((w) => w.includes(b)))).map((j) => [j.id, { id: j.id, name: j.name, state: 'waiting' as const }])
+    )
   }
   emit()
   const canIsolate = await isRepo(ws.root)
@@ -141,6 +156,7 @@ export async function startBuild(opts: { ids?: string[]; agent: AgentKind; maxPa
         await ws.fullScan() // later waves see what earlier ones built
       }
     }
+    if (!cancelled) await journeyPhase(opts.agent)
   } finally {
     state.running = false
     emit()
@@ -207,4 +223,62 @@ async function buildBox(id: string, agent: AgentKind, isolate: boolean): Promise
   if (b.state !== 'review') b.state = passed ? 'verified' : 'built'
   await ws.apply({ op: 'setSpec', id, spec: { status: passed ? 'verified' : 'built' } })
   emit()
+}
+
+/** After the boxes: write the missing journey tests, run them, and un-verify boxes whose journeys fail. */
+async function journeyPhase(agent: AgentKind): Promise<void> {
+  const ws = ctx.requireWs()
+  for (const js of Object.values(state.journeys)) {
+    if (cancelled) break
+    const model = ws.built!.model
+    const j = model.journeys?.find((x) => x.id === js.id)
+    if (!j) {
+      js.state = 'skipped'
+      js.note = 'journey no longer exists'
+      emit()
+      continue
+    }
+    const label = (id: string): string => model.nodes.find((n) => n.id === id)?.label ?? id
+    const blocked = journeyBoxes(j).filter((b) => ['failed', 'review'].includes(state.boxes[b]?.state ?? ''))
+    if (blocked.length || !journeyBuilt(model, j)) {
+      js.state = 'skipped'
+      js.note = blocked.length ? `waits for ${blocked.map(label).join(', ')}` : 'not all its boxes are built'
+      emit()
+      continue
+    }
+    let result
+    const hasTest = j.test && (await ws.readFile(j.test).then(() => true, () => false))
+    if (!hasTest) {
+      // Plans need approval unless every box on the journey may act alone.
+      const autoApprove = journeyBoxes(j).every((b) => model.nodes.find((n) => n.id === b)?.spec?.autonomy === 'auto')
+      try {
+        const { sessionId, done } = await writeJourneyTest(j.id, agent, { autoApprove, gated: true })
+        js.state = 'writing'
+        js.sessionId = sessionId
+        emit()
+        result = await done
+      } catch (e) {
+        js.state = 'skipped'
+        js.note = (e as Error).message
+        emit()
+        continue
+      }
+    } else {
+      js.state = 'running'
+      emit()
+      result = (await runJourneyTests([j.id], { gated: true }))[j.id]
+    }
+    js.state = result?.status === 'pass' ? 'pass' : result?.status === 'fail' ? 'fail' : 'skipped'
+    js.note = result?.status === 'fail' ? result.failures?.[0] : result?.status === 'blocked' || result?.status === 'missing' || result?.status === 'notrun' ? (result.failures?.[0] ?? 'test not written') : undefined
+    if (js.state === 'fail') {
+      for (const b of journeyBoxes(j)) {
+        const bs = state.boxes[b]
+        if (bs?.state !== 'verified') continue
+        bs.state = 'built'
+        bs.note = `journey "${j.name}" fails`
+        await ws.apply({ op: 'setSpec', id: b, spec: { status: 'built' } })
+      }
+    }
+    emit()
+  }
 }

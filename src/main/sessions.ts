@@ -9,6 +9,7 @@ import type { SessionInfo, StartSessionInput } from '@shared/api'
 import type { Workspace } from './workspace'
 import { addWorktree, createCheckpoint, diffCounts, isRepo, removeWorktree, showAt } from './git'
 import { humanize } from './engine/group'
+import { isJourneyTest } from './journeyPlan'
 
 // Sessions are what the map lights up for. One "watching" session always observes the repo, so
 // edits from *any* agent or editor show up (agent-agnostic). Agent runs get their own session with
@@ -332,7 +333,8 @@ export class SessionManager extends EventEmitter {
     // Update the model for files in the main repo (worktrees are separate copies).
     if (dir === this.ws.root) await this.queueModelUpdate(rel)
 
-    const classify = this.ws.ownerOfFile(rel) ? undefined : this.classify(rel)
+    // Journey tests span boxes on purpose: they are never new-box candidates.
+    const classify = this.ws.ownerOfFile(rel) || isJourneyTest(rel, this.ws.built?.model) ? undefined : this.classify(rel)
     const edges = this.ws.edgesForFile(rel)
     this.push(s.id, {
       t: 'edit',

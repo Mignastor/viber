@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { create } from 'zustand'
-import type { Acp, ArchModel, Question, ZoomLevel } from '@shared/model'
+import type { Acp, ArchModel, JourneyTestResult, Question, ZoomLevel } from '@shared/model'
 import type { ActorInput, AgentKind, DefsOp, ScanProgress, SessionInfo, WorkspaceSnapshot } from '@shared/api'
 import { sampleModel } from './model/sample'
 import { scenario, TASK_PROMPT, type SimEvent } from './sim/scenario'
@@ -36,6 +36,7 @@ export interface BuildState {
   running: boolean
   waves: string[][]
   boxes: Record<string, BuildBoxState>
+  journeys?: Record<string, { id: string; name: string; state: 'waiting' | 'writing' | 'running' | 'pass' | 'fail' | 'skipped'; sessionId?: string; note?: string }>
 }
 
 export interface RuntimeStats {
@@ -127,6 +128,8 @@ interface Store {
   questions: Question[]
   acps: Acp[]
   build: BuildState | null
+  /** The last run of each journey's end-to-end test. */
+  journeyResults: Record<string, JourneyTestResult>
 
   enterDemo: () => void
   leaveToWelcome: () => void
@@ -230,6 +233,7 @@ export const useStore = create<Store>((set, get) => ({
   questions: [],
   acps: [],
   build: null,
+  journeyResults: {},
   setActiveSession: async (id) => {
     const events = await window.viber.invoke<SimEvent[]>('session:events', id).catch(() => [] as SimEvent[])
     void window.viber.invoke('session:setActive', id)

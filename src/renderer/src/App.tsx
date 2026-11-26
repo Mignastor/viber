@@ -8,7 +8,7 @@ import type { SimEvent } from '@shared/events'
 import { bumpFiles } from './files'
 import { BottomPanel } from './components/BottomPanel'
 import type { BuildState, RuntimeStats } from './store'
-import type { Acp, Question } from '@shared/model'
+import type { Acp, JourneyTestResult, Question } from '@shared/model'
 import { DesignPanel } from './components/DesignPanel'
 import { BuildPanel } from './components/BuildPanel'
 import { TopBar } from './components/TopBar'
@@ -55,7 +55,10 @@ function useMainEvents(): void {
           void window.viber.invoke<Acp[]>('acp:list').then((acps) => useStore.setState({ acps }))
         }
         useStore.setState({ progress: null, busy: null })
+        // Journeys or their test files may have changed with the model.
+        void window.viber.invoke<Record<string, JourneyTestResult>>('journeys:results').then((journeyResults) => useStore.setState({ journeyResults })).catch(() => {})
       }),
+      window.viber.on('journeys:results', (journeyResults: Record<string, JourneyTestResult>) => useStore.setState({ journeyResults })),
       window.viber.on('ws:progress', (p: ScanProgress) => st().setProgress(p)),
       window.viber.on('session:list', (list: SessionInfo[]) => useStore.setState({ sessions: list })),
       window.viber.on('session:event', ({ sessionId, event }: { sessionId: string; event: SimEvent }) => {

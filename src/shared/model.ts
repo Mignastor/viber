@@ -183,6 +183,20 @@ export interface Journey {
   actor: string
   name: string
   steps: JourneyStep[]
+  /** The end-to-end test that plays this journey on the real code (repo-relative), once written. */
+  test?: string
+}
+
+/** The last run of a journey's end-to-end test. */
+export interface JourneyTestResult {
+  id: string
+  /** missing: no test yet. notrun: written, never run. blocked: Viber may not run its test runner. */
+  status: 'pass' | 'fail' | 'missing' | 'notrun' | 'blocked' | 'writing'
+  file?: string
+  command?: string
+  /** Failure lines from the test output. */
+  failures?: string[]
+  at?: number
 }
 
 export interface DriftItem {

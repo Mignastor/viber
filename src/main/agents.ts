@@ -11,6 +11,7 @@ import { mcpUrl } from './mcp'
 import { getSettings } from './settings'
 import { createAgentProvider } from './llm'
 import { runImpactedTests } from './runner'
+import { runJourneyTestsAfterSession } from './journeyTests'
 import { whereToChange } from './targeting'
 import { resolveExecutable, runCodex, runGemini, signInFailed } from './cliAgents'
 import { cliStatuses } from './agentStatus'
@@ -34,7 +35,10 @@ export async function startSession(input: StartSessionInput): Promise<string> {
 
   const instructions = input.baseline ? BASELINE_INSTRUCTIONS : agentInstructions(ws, input.scope)
   const finish = async (summary: string, status: 'done' | 'error' | 'stopped'): Promise<void> => {
-    if (status !== 'stopped') await runImpactedTests(s.id).catch(() => {})
+    if (status !== 'stopped') {
+      await runImpactedTests(s.id).catch(() => {})
+      await runJourneyTestsAfterSession(s.id).catch(() => {})
+    }
     sm.closeGates(s.id, { approved: false, feedback: 'The session ended.' })
     sm.push(s.id, { t: 'done', summary, tokens: 0, naive: 0 })
     sm.setStatus(s.id, status)
@@ -79,6 +83,7 @@ export async function finishSession(id: string): Promise<void> {
   const s = sm?.get(id)
   if (!sm || !s || s.info.ambient) return
   await runImpactedTests(id).catch(() => {})
+  await runJourneyTestsAfterSession(id).catch(() => {})
   const files = new Set(s.events.flatMap((e) => (e.t === 'edit' ? [e.file] : [])))
   sm.push(id, { t: 'done', summary: `Finished: ${files.size} file${files.size === 1 ? '' : 's'} changed.`, tokens: 0, naive: 0 })
   sm.setStatus(id, 'done')

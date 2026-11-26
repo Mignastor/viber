@@ -44,17 +44,26 @@ contract. That one description does three jobs:
    has a journey and every step goes through a contract. A **dry run** goes further: an AI plays the journey step by
    step, saying what data crosses each contract and what changes, and Viber checks each step against the real design.
    You can also describe a scenario in words and dry-run it without saving it.
-3. **It drives the code.** When a box is built, its agent gets every journey that passes through it along with its
-   spec and contracts, so it knows the box's part in the larger flow, not just its own functions.
+3. **It drives the tests of the real code.** When a box is built, its agent gets every journey that passes through
+   it, so it knows the box's part in the larger flow. Once all of a journey's boxes are built, an agent turns the
+   journey into **one end-to-end test** (in `tests/journeys/`). The test goes in at the first box's front door,
+   through the real code of every box in order, and checks what each step promises. Each check is named after its
+   step, so a failure tells you which step broke. Viber runs journey tests at the end of every build, after any agent
+   session that touches one of their boxes, and when you click *Run journey tests*. A box only counts as
+   **verified** when its own tests pass and so do the journeys through it.
 
 ![A journey played on the map: the Reminders → Notifier step has no contract, and the design check flags it](docs/screenshots/journey-gap.png)
 
-*Here the "reminder the day before" journey reaches Notifier, but nobody drew a contract from Reminders to Notifier.
-The map shows the broken hop, and the design check lists it with a button to ask the architect to fix it.*
+*Before the build: the "reminder the day before" journey reaches Notifier, but nobody drew a contract from Reminders
+to Notifier. The map shows the broken hop, and the design check lists it with a button to ask the architect to fix it.*
 
-**Next:** turning each journey into an end-to-end acceptance test on the real code, so a journey that passed as a
-design keeps passing once the code exists. Today, agents write tests for each box's acceptance criteria and contract.
-Generating tests from journeys isn't built yet.
+![The Design tab after a build: one journey test passes, the reminder journey's test fails at step 4](docs/screenshots/journey-tests.png)
+
+*After the build: the same gap, now caught in the code. The RSVP journey's test passes. The reminder journey's test
+fails at step 4, "Notifier emails each member", because Reminders never calls the Notifier.*
+
+Journey tests run automatically only if their test runner is in Settings → allowed commands (for example `npm test`
+or `python -m pytest`). Clicking *Run journey tests* or *Write the test* runs them regardless.
 
 ## A tour
 
@@ -183,7 +192,8 @@ More tools:
   - Architect chat: describe what you want; it proposes components, contracts, actors and journeys as a diagram diff, previewed dashed on the map. Accept or reject.
   - Agents' questions pinned on boxes; an answer can become a rule on the box.
   - Journeys (see [Journeys](#journeys-what-humans-write)): add them by hand or from the architect, play them on the
-    map step by step, or dry-run them.
+    map step by step, or dry-run them. Each shows whether its end-to-end test passes; *Write the test* asks an agent
+    for a missing one.
   - Drift between the design and the code.
 - **On the map:**
   - *+ Component* adds a planned box.
@@ -209,6 +219,7 @@ More tools:
 - **Drift** lists the important things first (contract mismatches, undeclared effects). Undeclared routes and
   dependencies of a box fold into one row with *Add them to the contract / design*.
 - **Build tab:** planned components become agent tasks generated from their spec, built providers-first in parallel worktrees.
+  Then each journey through them gets its end-to-end test written (if it has none) and run.
 
 ## Agent tools (MCP and built-in agent)
 
@@ -272,6 +283,7 @@ src/main/            Electron main process
   engine/            scan (tree-sitter, in a worker), resolve imports, group into boxes, detect, build model, YAML store
   workspace.ts       one open repo: defs + scan → model, curation ops, search, bug → box
   sessions.ts        watcher, git checkpoints, plan gate, reverts, contract diffs
+  journeyTests.ts    journeys as end-to-end tests: write, run, results (helpers in journeyPlan.ts)
   tools.ts mcp.ts    the agent tool surface and the MCP server (HTTP)
   agents.ts llm.ts   Claude Code runner, built-in agent loop, providers (Claude SDK, OpenAI-compatible)
   runner.ts runtime.ts preview.ts terminal.ts insights.ts git.ts settings.ts

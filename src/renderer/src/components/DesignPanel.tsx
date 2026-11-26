@@ -2,9 +2,9 @@ import { useEffect, useRef, useState } from 'react'
 import { StyleFields } from './SpecEditor'
 import { designCheck, gapsAsRequest } from '@shared/designCheck'
 import { askArchitect, decideProposal } from '../architectChat'
-import { Check, CircleAlert, FileDiff, FlaskConical, ListChecks, Ruler, Loader2, MessageCircleQuestion, Play, Plus, Route, Sparkles, X } from 'lucide-react'
+import { Check, CircleAlert, FileDiff, FlaskConical, ListChecks, Ruler, Loader2, MessageCircleQuestion, Play, Plus, Route, Sparkles, TestTube2, X } from 'lucide-react'
 import type { DefsOp } from '@shared/api'
-import type { Acp, DriftItem, Journey, Question } from '@shared/model'
+import type { Acp, DriftItem, Journey, JourneyTestResult, Question } from '@shared/model'
 import { useModel, useStore } from '../store'
 
 // Design: talk to the architect (it proposes diagram diffs you accept or reject), define actor
@@ -186,6 +186,7 @@ export function DesignPanel() {
   const recentAcps = acps.filter((a) => a.status !== 'pending').slice(-3).reverse()
   const drift = (snapshotModel?.drift ?? []) as DriftItem[]
   const journeys = model.journeys ?? []
+  const journeyResults = useStore((s) => s.journeyResults)
   const label = (id: string): string => model.nodes.find((n) => n.id === id)?.label ?? id
   // Accept what the code does today as the design (one click instead of one item at a time).
   const adopt = (r: DriftRow): void => {
@@ -312,9 +313,10 @@ export function DesignPanel() {
             <span className="list-label">
               {label(j.actor)}: {j.name}
             </span>
-            <span className="tree-meta">{j.steps.length} steps</span>
+            <JourneyTestBadge result={journeyResults[j.id]} />
           </div>
         ))}
+        {journeys.length > 0 && <JourneyTests journeys={journeys} results={journeyResults} />}
         {model.nodes.some((n) => n.kind === 'box' && !n.proposed) && (
           <div className="row-gap scenario-row">
             <input className="edit-input" value={scenario} placeholder="Try a scenario, e.g. a player casts Fireball at two goblins" onChange={(e) => setScenario(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && scenario.trim() && void runDry({ scenario: scenario.trim() })} />
@@ -325,7 +327,12 @@ export function DesignPanel() {
         )}
         {dry && <DesignProgress fallback="Running the scenario through the design…" />}
         {dryError && <p className="bad small">{dryError.replace(/^NO_AGENT: /, '')}</p>}
-        {journeys.length === 0 && <p className="muted small">Paths actors take through the boxes. They become end-to-end tests.</p>}
+        {journeys.length === 0 && (
+          <p className="muted small">
+            Paths actors take through the boxes, step by step. They check the design before anything is built, and once their boxes are built
+            each one becomes an end-to-end test on the real code.
+          </p>
+        )}
         <button className="btn small ghost" onClick={() => setModal({ kind: 'journey' })}>
           <Plus size={12} /> Add journey
         </button>
@@ -481,6 +488,93 @@ function QuestionCard({ q, label }: { q: Question; label: (id: string) => string
           <input type="checkbox" checked={asRule} onChange={(e) => setAsRule(e.target.checked)} /> Keep the answer as a rule on {label(q.anchor)}
         </label>
       )}
+    </div>
+  )
+}
+
+const BADGE: Record<JourneyTestResult['status'], { text: string; cls: string; title: string }> = {
+  pass: { text: '✓ test passes', cls: 'ok', title: 'Its end-to-end test passed on the last run.' },
+  fail: { text: '✗ test fails', cls: 'bad', title: 'Its end-to-end test failed on the last run.' },
+  missing: { text: 'no test', cls: '', title: 'No end-to-end test yet. One is written once all its boxes are built.' },
+  notrun: { text: 'not run', cls: '', title: 'It has a test that has not run yet.' },
+  blocked: { text: 'not run', cls: 'bad', title: 'Viber could not run its test.' },
+  writing: { text: 'writing test…', cls: '', title: 'An agent is writing its end-to-end test.' }
+}
+
+/** Where a journey's end-to-end test stands. */
+function JourneyTestBadge({ result }: { result?: JourneyTestResult }) {
+  const b = BADGE[result?.status ?? 'missing']
+  return (
+    <span className={`tree-meta ${b.cls}`} title={[b.title, result?.file, result?.failures?.[0]].filter(Boolean).join('\n')}>
+      {b.text}
+    </span>
+  )
+}
+
+/** Journeys as tests of the real code: write the missing ones, run them, see what broke. */
+function JourneyTests({ journeys, results }: { journeys: Journey[]; results: Record<string, JourneyTestResult> }) {
+  const model = useModel()
+  const agent = useStore((s) => s.agent)
+  const [busy, setBusy] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const built = (j: Journey): boolean =>
+    j.steps.length > 0 &&
+    j.steps.every((s) => {
+      const n = model.nodes.find((x) => x.id === s.box)
+      return !!n && (n.spec?.status ? n.spec.status === 'built' || n.spec.status === 'verified' : n.files.length > 0)
+    })
+  const status = (j: Journey): JourneyTestResult['status'] => results[j.id]?.status ?? 'missing'
+  const withTest = journeys.filter((j) => !['missing', 'writing'].includes(status(j)))
+  const toWrite = journeys.filter((j) => status(j) === 'missing' && built(j))
+  const failing = journeys.filter((j) => ['fail', 'blocked'].includes(status(j)))
+  const strip = (e: unknown): string => String((e as Error).message ?? e).replace(/^Error invoking remote method '[^']+': (Error: )?/, '')
+  const run = async (): Promise<void> => {
+    setBusy('run')
+    setError(null)
+    try {
+      await window.viber.invoke('journeys:run')
+    } catch (e) {
+      setError(strip(e))
+    } finally {
+      setBusy(null)
+    }
+  }
+  const write = async (j: Journey): Promise<void> => {
+    setBusy(j.id)
+    setError(null)
+    try {
+      const id = await window.viber.invoke<string>('journeys:write', j.id, agent === 'external' ? 'claude-code' : agent)
+      void useStore.getState().setActiveSession(id)
+    } catch (e) {
+      setError(strip(e))
+    } finally {
+      setBusy(null)
+    }
+  }
+  if (!withTest.length && !toWrite.length) return null
+  return (
+    <div className="journey-tests">
+      {failing.map((j) => (
+        <div key={j.id} className="journey-failure small">
+          <span className="bad">{j.name}</span>
+          {(results[j.id]?.failures ?? []).slice(0, 3).map((l, i) => (
+            <code key={i} className="block">
+              {l}
+            </code>
+          ))}
+        </div>
+      ))}
+      {toWrite.map((j) => (
+        <button key={j.id} className="btn small" disabled={!!busy} onClick={() => void write(j)} title="An agent writes one test that plays this journey through the real code of its boxes">
+          {busy === j.id ? <Loader2 size={12} className="spin" /> : <TestTube2 size={12} />} Write the test for “{j.name}”
+        </button>
+      ))}
+      {withTest.length > 0 && (
+        <button className="btn small" disabled={!!busy} onClick={() => void run()}>
+          {busy === 'run' ? <Loader2 size={12} className="spin" /> : <Play size={12} />} Run journey tests ({withTest.length})
+        </button>
+      )}
+      {error && <p className="bad small">{error}</p>}
     </div>
   )
 }

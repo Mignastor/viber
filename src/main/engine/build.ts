@@ -6,6 +6,7 @@ import { proposeBoxes, humanize, type BoxDef } from './group'
 import { hostService, knownService, pathsMatch, topicsMatch } from './detect'
 import { checkFunction, checkHttp } from './contracts'
 import { LANGS } from './languages'
+import { isJourneyTest } from '../journeyPlan'
 
 // Assembles the architecture model from (curated definitions + a fresh scan).
 // Definitions say *what the boxes are*; the scan says *what is in them and how they connect*.
@@ -102,10 +103,11 @@ export function buildModel(scan: ScanResult, res: Resolution, defs: ArchDefs, op
     else unmapped.push(f.path)
   }
 
-  // Tests map to the box they exercise most (by imports), else by mirrored path.
+  // Tests map to the box they exercise most (by imports), else by mirrored path. Journey tests
+  // cross several boxes on purpose and belong to their journey, not to one box.
   const testsOf = new Map<string, string[]>()
   for (const f of scan.files) {
-    if (!f.flags.includes('test')) continue
+    if (!f.flags.includes('test') || isJourneyTest(f.path, { journeys: defs.journeys ?? [] })) continue
     const votes = new Map<string, number>()
     for (const d of res.deps) if (d.from === f.path && fileOwner[d.to]) votes.set(fileOwner[d.to], (votes.get(fileOwner[d.to]) ?? 0) + 1)
     let target: string | undefined = [...votes.entries()].sort((a, b) => b[1] - a[1])[0]?.[0]

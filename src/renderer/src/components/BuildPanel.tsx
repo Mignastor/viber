@@ -8,6 +8,7 @@ import { designCheck } from '@shared/designCheck'
 // waves in worktrees. Each box's autonomy decides whether you approve its plan.
 
 const STATE_LABEL: Record<string, string> = { waiting: 'waiting', running: 'building', built: 'built', verified: 'verified ✓', failed: 'failed', review: 'needs review' }
+const JOURNEY_LABEL: Record<string, string> = { waiting: 'waiting', writing: 'writing test', running: 'running test', pass: 'passes ✓', fail: 'fails ✗', skipped: 'skipped' }
 
 export function BuildPanel() {
   const model = useModel()
@@ -32,10 +33,14 @@ export function BuildPanel() {
   const gaps = designCheck(model).filter((i) => !i.ok)
   const start = async (): Promise<void> => {
     setError(null)
-    if (gaps.length && !window.confirm(`The design has ${gaps.length} gap${gaps.length > 1 ? 's' : ''}:\\n\\n${gaps.map((g) => `- ${g.title}${g.detail ? `: ${g.detail}` : ''}`).join('\\n')}\\n\\nAgents build what the design says, so gaps become guesses. Build anyway?`)) return
+    if (gaps.length && !window.confirm(`The design has ${gaps.length} gap${gaps.length > 1 ? 's' : ''}:\n\n${gaps.map((g) => `- ${g.title}${g.detail ? `: ${g.detail}` : ''}`).join('\n')}\n\nAgents build what the design says, so gaps become guesses. Build anyway?`)) return
     await window.viber.invoke('build:start', { agent, maxParallel: parallel })
   }
   const waves = build?.running || build?.waves.length ? build.waves : plan
+  // Journeys through the boxes being built get their end-to-end test written and run afterwards.
+  const journeyRows = build?.journeys && Object.keys(build.journeys).length
+    ? Object.values(build.journeys)
+    : (model.journeys ?? []).filter((j) => j.steps.some((s) => waves.some((w) => w.includes(s.box)))).map((j) => ({ id: j.id, name: j.name, state: 'waiting' as const, note: undefined, sessionId: undefined }))
 
   return (
     <div className="build-panel">
@@ -45,7 +50,8 @@ export function BuildPanel() {
         </h3>
         <p className="muted small">
           Planned components become agent tasks generated from their spec, contracts and journeys. Providers are built before
-          consumers; a wave runs in parallel worktrees. “Ask me” boxes wait for your plan approval.
+          consumers; a wave runs in parallel worktrees. “Ask me” boxes wait for your plan approval. Then each journey through them
+          becomes an end-to-end test on the real code: a box is verified only when its own tests and its journeys pass.
         </p>
         {planned.length === 0 && !build?.running && <p className="small">No planned components. Add one on the map (+ Component) or ask the architect.</p>}
         {waves.map((w, i) => (
@@ -64,6 +70,23 @@ export function BuildPanel() {
             })}
           </div>
         ))}
+        {journeyRows.length > 0 && (
+          <div className="wave">
+            <span className="wave-n">Journeys</span>
+            {journeyRows.map((j) => (
+              <div
+                key={j.id}
+                className={`wave-box st-${j.state === 'pass' ? 'verified' : j.state === 'fail' ? 'failed' : j.state === 'writing' || j.state === 'running' ? 'running' : 'waiting'}`}
+                onClick={() => j.sessionId && void setActiveSession(j.sessionId)}
+              >
+                {(j.state === 'writing' || j.state === 'running') && <Loader2 size={11} className="spin" />}
+                <span className="list-label">{j.name}</span>
+                <span className="tree-meta">{JOURNEY_LABEL[j.state]}</span>
+                {j.note && <span className="muted small block">{j.note}</span>}
+              </div>
+            ))}
+          </div>
+        )}
         {error && <p className="bad small">{error}</p>}
         {build?.running ? (
           <button className="btn" onClick={() => void window.viber.invoke('build:stop')}>

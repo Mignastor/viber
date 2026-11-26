@@ -4,6 +4,7 @@ import type { ArchNode } from '@shared/model'
 import { ctx } from './context'
 import { getSettings } from './settings'
 import { recordRuntimeHit } from './runtime'
+import { isJourneyTest } from './journeyPlan'
 
 // Running the app and its tests. Output is streamed to the UI; stack traces are mapped to boxes
 // (they turn red on the map) and request log lines light up the route boxes.
@@ -130,9 +131,11 @@ export async function runImpactedTests(sessionId: string): Promise<void> {
   // Tests mapped to touched boxes count too.
   const touchedBoxes = new Set(changed.map((f) => ws.ownerOfFile(f)).filter(Boolean) as string[])
   for (const n of ws.built?.model.nodes ?? []) if (touchedBoxes.has(n.id)) for (const t of n.tests ?? []) tests.add(t)
-  const list = [...tests]
+  // Journey tests run separately, as journeys (see journeyTests.ts).
+  const list = [...tests].filter((t) => !isJourneyTest(t, ws.built?.model))
   const total = ws.allFiles().filter((f) => f.flags.includes('test')).length
   if (!list.length) {
+    if (changed.every((f) => isJourneyTest(f, ws.built?.model))) return
     sm.push(sessionId, { t: 'message', role: 'system', text: `No tests cover the ${changed.length} changed file(s).`, tokens: 0, naive: 0 })
     return
   }
@@ -148,13 +151,7 @@ export async function runImpactedTests(sessionId: string): Promise<void> {
     })
     return
   }
-  const result = await new Promise<{ code: number; out: string }>((resolve) => {
-    const child = spawn(cmd.command, { cwd: path.join(s.root, cmd.cwd), shell: true, windowsHide: true, env: { ...process.env, FORCE_COLOR: '0', CI: '1' } })
-    let out = ''
-    child.stdout.on('data', (d) => (out += d))
-    child.stderr.on('data', (d) => (out += d))
-    child.on('close', (code) => resolve({ code: code ?? 1, out }))
-  })
+  const result = await execTests(cmd, s.root)
   const perFile = parseTestOutput(result.out, list)
   const results: Record<string, { passed: number; failed: number }> = {}
   const boxOfTest = (t: string): string | undefined => (ws.built?.model.nodes as ArchNode[] | undefined)?.find((n) => n.tests?.includes(t))?.id
@@ -164,15 +161,39 @@ export async function runImpactedTests(sessionId: string): Promise<void> {
     const r = perFile[t] ?? (result.code === 0 ? { passed: 1, failed: 0 } : { passed: 0, failed: 1 })
     results[box] = { passed: (results[box]?.passed ?? 0) + r.passed, failed: (results[box]?.failed ?? 0) + r.failed }
   }
-  const failures = result.out
-    .split('\n')
-    .filter((l) => /FAIL|FAILED|✗|×|Error:/.test(l))
-    .slice(0, 6)
-    .map((l) => l.trim().slice(0, 160))
+  const failures = failureLines(result.out)
   sm.push(sessionId, { t: 'tests', selected: list.length, total, results, failures: result.code === 0 ? [] : failures, tokens: 0, naive: 0 })
 }
 
-function testCommand(files: string[]): { command: string; cwd: string } | null {
+/** Run a test command in a directory and collect its output. */
+export function execTests(cmd: { command: string; cwd: string }, root: string): Promise<{ code: number; out: string }> {
+  return new Promise((resolve) => {
+    const child = spawn(cmd.command, { cwd: path.join(root, cmd.cwd), shell: true, windowsHide: true, env: { ...process.env, FORCE_COLOR: '0', CI: '1' } })
+    let out = ''
+    child.stdout.on('data', (d) => (out += d))
+    child.stderr.on('data', (d) => (out += d))
+    child.on('error', (e) => (out += String(e)))
+    child.on('close', (code) => resolve({ code: code ?? 1, out }))
+  })
+}
+
+/** The lines that say what failed: error messages first, then failed test names; no repeats or timings. */
+export function failureLines(out: string): string[] {
+  const lines = out
+    .split('\n')
+    .map((l) => l.trim().replace(/\s*\(\d+(\.\d+)?\s*m?s\)$/, ''))
+    .filter((l) => /FAIL|FAILED|✗|✖|×|Error:|AssertionError/.test(l) && !/^[✖✗×]?\s*failing tests:?$/i.test(l))
+  const errors = lines.filter((l) => /Error\b/.test(l))
+  return [...new Set([...errors, ...lines])].slice(0, 6).map((l) => l.slice(0, 160))
+}
+
+/** Whether Viber may run this command on its own (Settings → allowed commands). */
+export async function commandAllowed(command: string): Promise<boolean> {
+  const settings = await getSettings()
+  return settings.allowedCommands.some((p) => p && command.startsWith(p))
+}
+
+export function testCommand(files: string[]): { command: string; cwd: string } | null {
   const ws = ctx.ws!
   const manifests = ws.scan?.manifests ?? {}
   const py = files.filter((f) => f.endsWith('.py'))

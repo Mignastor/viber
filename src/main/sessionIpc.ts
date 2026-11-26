@@ -19,6 +19,7 @@ import { answerQuestion, dismissQuestion, listQuestions } from './questions'
 import { decideAcp, listAcps, startFollowUps } from './acp'
 import { architect, type ArchitectTurn } from './architect'
 import { getBuildState, planBuild, startBuild, stopBuild } from './orchestrator'
+import { journeyResults, runJourneyTests, writeJourneyTest } from './journeyTests'
 import type { DefsOp } from '@shared/api'
 
 export function registerSessionIpc(): void {
@@ -132,6 +133,14 @@ export function registerSessionIpc(): void {
     void startBuild(opts).catch((e) => ctx.emit('build:error', String((e as Error).message ?? e)))
   })
   ctx.handle('build:stop', () => stopBuild())
+  ctx.handle('journeys:results', () => journeyResults())
+  // A click: run them even if the test runner isn't in the allowed commands.
+  ctx.handle('journeys:run', (ids?: string[]) => runJourneyTests(ids))
+  ctx.handle('journeys:write', async (id: string, agent: AgentKind) => {
+    const { sessionId, done } = await writeJourneyTest(id, agent)
+    void done
+    return sessionId
+  })
   ctx.handle('app:reveal', (rel: string) => shell.showItemInFolder(path.join(ctx.requireWs().root, rel)))
 }
 
